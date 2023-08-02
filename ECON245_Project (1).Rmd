@@ -1,0 +1,260 @@
+---
+title: "ECON245 Project"
+output: html_notebook
+---
+ 
+```{r}
+#importing the data
+
+datatest <- read.csv(file = "vietnamhs.csv")
+#str(datatest)
+#summary(datatest)
+```
+
+```{r}
+#changing factor levels to 2 instead of 3 for UseMon
+library(dplyr)
+datatest <- datatest |> mutate (wouldtake_GHE = ifelse( UseMon != "later", 1, 0))
+str(datatest)
+```
+
+
+```{r}
+#cdata wrangling:
+#1.age groups from 5 lvls to 3 lvls
+#unique(datatest$Age_gr)
+datatest$Age_gr <- ifelse(datatest$Age_gr %in% c("<18", "18-29"), "<29", datatest$Age_gr)
+datatest$Age_gr <- ifelse(datatest$Age_gr %in% c(">=50", "40-49"), ">=40", datatest$Age_gr)
+#unique(datatest$Age_gr)
+```
+
+```{r}
+#2. changing Jobstt levels from 6 to 3
+
+#unique(datatest$Jobstt)
+
+datatest$Jobstt <- ifelse(datatest$Jobstt %in% c("other","housewife","retirer"), "Unemployed", datatest$Jobstt)
+datatest$Jobstt <- ifelse(datatest$Jobstt %in% c("unstable","stable"), "Employed", datatest$Jobstt)
+
+#unique(datatest$Jobstt)
+```
+
+```{r}
+#2.changing Edu levels from 4 to 3
+
+#unique(datatest$Edu)
+datatest$Edu <- ifelse(datatest$Edu %in% c("Grad","PostGrad"), "MinGrad", "Minsecond")
+
+#3. added new
+datatest$MaritalStt <- ifelse(datatest$MaritalStt %in% c("other", "unmarried"), "unmarried","married")
+```
+
+```{r}
+#4. unique(datatest$CHPerc)
+datatest$CHPerc <- ifelse(datatest$CHPerc %in% c("good","quite"), "good", datatest$CHPerc)
+```
+
+```{r}
+#5. changing all scale variables from 5 factor levels to 2 
+
+datatest$ImpressInfo <- ifelse(datatest$ImpressInfo <= 2, "BelowAvg","AboveAvg")
+datatest$Reliability <- ifelse(datatest$Reliability <= 2, "BelowAvg","AboveAvg")
+datatest$Respon <- ifelse(datatest$Respon <= 2, "BelowAvg","AboveAvg")
+datatest$Assurance <- ifelse(datatest$Assurance <= 2, "BelowAvg","AboveAvg")
+datatest$Empathy <- ifelse(datatest$Empathy <= 2, "BelowAvg","AboveAvg")
+datatest$PopularInfo <- ifelse(datatest$PopularInfo <= 2, "BelowAvg","AboveAvg")
+datatest$AttractInfo <- ifelse(datatest$AttractInfo <= 2, "BelowAvg","AboveAvg")
+datatest$SuffInfo <- ifelse(datatest$SuffInfo <= 2, "BelowAvg","AboveAvg")
+datatest$Tangibles <- ifelse(datatest$Tangibles <= 2, "BelowAvg","AboveAvg")
+```
+
+```{r}
+#changing chr and appropriate num classes to factor levels
+
+library(dplyr)
+datatest_ftr <- datatest |>
+  select( -c("id", "date","Age", "height","weight","BMI", "SuitExer", "wouldtake_GHE", "UseMon")) #take out the variables that should be numeric, chr and not factor
+#str(datatest_ftr)
+```
+
+```{r}
+#changing chr to factor
+datatest_ftr[sapply(datatest_ftr, is.character)] <- lapply(datatest_ftr[sapply(datatest_ftr, is.character)],as.factor)
+```
+
+```{r}
+#adding back numerical variables to our dataframe
+
+datatest_num <- datatest |>
+  select( c( "height","weight","BMI","wouldtake_GHE", "SuitExer"))
+
+analysis <- cbind(datatest_ftr, datatest_num)
+
+#check our new dataset
+#str(analysis)
+
+```
+
+
+```{r}
+#checking the variable names
+names(analysis)
+```
+
+```{r}
+#choosing only variables of interest
+analysis1 <- analysis |>
+  select("wouldtake_GHE", "Age_gr", "Sex", "Jobstt", "HealthIns", "BMI", "MaritalStt", "Edu" , "Wsttime", "Wstmon", "DiscDisease", "Lessbelqual", "NotImp", "HthyPriority", "Habit", "FlwHealth", "PerTrmt", "AcqTrmt", "StabHthStt" , "StChoise", "MedCabinet", "ExpCare", "ExamTools", "Tangibles", "Assurance", "Reliability", "Respon", "Empathy", "CHPerc", "SuitFreq", "SuffInfo", "AttractInfo", "ImpressInfo",   "PopularInfo", "UseIT", "AfterIT", "Tooluseskills", "EvalExer")
+```
+
+```{r}
+#eda
+library(ggplot2)
+
+gg1 <- ggplot(data = analysis, aes(x = EvalExer, y = SuitExer)) +
+  geom_boxplot()
+
+
+gg1
+```
+
+```{r}
+#eda
+gg3 <- ggplot(data = analysis, aes(x = Edu, y = SuitExer )) +
+  geom_boxplot()
+
+
+gg3
+```
+
+```{r}
+#eda
+gg2 <- ggplot(data = analysis, aes(x = height, y = weight)) +
+  geom_point() +
+  geom_smooth()+
+  facet_wrap(~MaritalStt)
+gg2
+```
+
+```{r}
+analysis2 <- na.omit(analysis1) #dataset with chosen variables without NA values
+```
+
+```{r}
+analysis3 <- na.omit(analysis)
+```
+
+```{r}
+#running on the whole dataset to show the std error
+dt_ch <- glm(wouldtake_GHE~. ,  data=analysis3, family="binomial") 
+summary(dt_ch )  
+```
+
+```{r}
+#running logistic regression with our 1st model (base model)
+md1 <- glm(wouldtake_GHE~. ,  data=analysis2, family="binomial") 
+summary(md1 )  
+
+```
+
+
+```{r}
+#standardizing numerical variable BMI - only for LASSO and ridge analysis
+
+analysis5 <- analysis2 |>
+  mutate(stdz_bmi = (BMI - mean(BMI)) / sd(BMI)) |>
+  select(-BMI)
+
+
+```
+
+Regularisation methods
+```{r}
+#creating matrix and training/testing sets for regularization
+
+library(glmnet)
+x <- model.matrix(wouldtake_GHE~., analysis5)[,-1]
+y <- analysis5$wouldtake_GHE
+grid <- c(0, 0.001, 0.002, 0.01, 0.03, 0.1, 0.5, 1, 5, 10, 15, 20, 25, 30)
+
+```
+
+
+```{r}
+#Lasso 
+
+#lasso.mod <- glmnet(x[train,], y[train], alpha=1, lambda=grid) #cv to find best lambda using training set
+#coef(lasso.mod,s= grid)
+
+set.seed(1805)
+cv.out <- cv.glmnet(x, y, alpha=1, family = "binomial")
+#plot(cv.out)
+
+bestlam <- cv.out$lambda.min #finding best lambda using cv
+bestlam
+
+
+lasso_model <- glmnet(x,y, alpha=1, lambda=bestlam, family="binomial") #fitting model on whole dataset
+
+lasso.coef <- predict(lasso_model, type="coefficients", s=bestlam)
+lasso.coef
+lasso.coef[lasso.coef!=0]
+```
+
+```{r}
+assess.glmnet(lasso_model, newx = x, newy = y)
+confusion.glmnet(lasso_model, newx = x, newy = y)
+```
+
+
+```{r}
+#roc curve
+problasso = predict(lasso_model,type=c("response"), newx = x, lambda = bestlam)  
+par(cex.lab=0.75,cex.axis=0.75, cex = 0.90) #global command to set font sizes
+# calculate and draw ROC
+ROCr = roc(y==1 ~ problasso, data = analysis5)
+plot(ROCr,print.thres=c(0.25,0.5,0.75),legacy.axes=F, print.auc = TRUE,col="Coral2")
+
+```
+
+
+```{r}
+#ridge 
+
+cvrr.out <- cv.glmnet(x, y, alpha=0, family ="binomial") #obtain the 10-fold cross validation error
+
+bestlam_rr <- cvrr.out$lambda.min  #identify the lambda for smallest CV error
+bestlam_rr
+
+
+rr_model <- glmnet(x,y,alpha=0, family = "binomial", lambda = bestlam_rr) #fit on whole data
+rr_model 
+
+rr.coef <- predict(rr_model, type="coefficients", s=bestlam_rr)
+rr.coef
+
+```
+
+```{r}
+assess.glmnet(rr_model, newx = x, newy = y)
+confusion.glmnet(rr_model, newx = x, newy = y)
+```
+
+
+```{r}
+probrr = predict(rr_model,type=c("response"), newx = x, lambda = bestlam_rr)  
+
+library(pROC)
+par(cex.lab=0.75,cex.axis=0.75, cex = 0.90) #global command to set font sizes
+# calculate and draw ROC
+ROCr = roc(y==1 ~ probrr, data = analysis5)
+plot(ROCr,print.thres=c(0.25,0.5,0.75),legacy.axes=F, print.auc = TRUE,col="Coral2")
+```
+
+
+```{r}
+#running logistic regression with our 1st model (base model)
+model_6 <- glm(wouldtake_GHE ~ Edu +Sex +BMI + HealthIns+ Wsttime + Wstmon +HthyPriority +FlwHealth + PerTrmt + ExamTools +CHPerc + Habit + StabHthStt+  Tooluseskills + UseIT+(Wsttime*Wstmon) +(CHPerc*StabHthStt)+(Edu*UseIT),  data=analysis2, family="binomial") 
+summary(model_8)  #AIC 1439.2
+
+```
